@@ -6,14 +6,14 @@ from botocore.config import Config
 
 app = FastAPI(title="Cloudflare R2 Uploader & Link Shortener")
 
-# Credenciales y configuración de R2
 R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "19e79842547693ffe34fbd1d311d25dc")
 R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME", "remesas-img")
 R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID", "f3a93d65fe3ddaaff42dcbbd81f4f774")
 R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY", "b29f83288b12cf4b17a638f343d574daf2093a89a31dd72b8417191ca786668d")
 
+# Dominio público real asignado por Cloudflare
+R2_PUBLIC_DOMAIN = "https://pub-49b9c87f6e6a418ba42de5ba36ddc73e.r2.dev"
 ENDPOINT_URL = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
-R2_PUBLIC_DOMAIN = f"{ENDPOINT_URL}/{R2_BUCKET_NAME}"
 
 s3_client = boto3.client(
     "s3",
@@ -31,7 +31,6 @@ def root():
 @app.post("/upload")
 def upload_image(file: UploadFile = File(...), filename: str = Form(None)):
     try:
-        # Si n8n envía un nombre personalizado (ej. hash.jpg), usa ese; de lo contrario usa el original
         final_filename = filename if filename else file.filename
         file_bytes = file.file.read()
         
@@ -55,9 +54,6 @@ def upload_image(file: UploadFile = File(...), filename: str = Form(None)):
 
 @app.get("/i/{image_hash}")
 def redirect_to_image(image_hash: str):
-    # Asigna extensión .jpg si el hash recibido no la incluye
     file_key = image_hash if image_hash.endswith((".jpg", ".png", ".jpeg")) else f"{image_hash}.jpg"
     r2_url = f"{R2_PUBLIC_DOMAIN}/{file_key}"
-    
-    # Redirige inmediatamente la petición al bucket de R2
     return RedirectResponse(url=r2_url, status_code=307)
