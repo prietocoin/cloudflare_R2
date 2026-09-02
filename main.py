@@ -5,7 +5,6 @@ from botocore.config import Config
 
 app = FastAPI(title="Cloudflare R2 Uploader")
 
-# Credenciales y variables de entorno (puedes cambiarlas o pasarlas como vars de sistema)
 R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "19e79842547693ffe34fbd1d311d25dc")
 R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME", "remesas-img")
 R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID", "f3a93d65fe3ddaaff42dcbbd81f4f774")
@@ -13,7 +12,6 @@ R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY", "b29f83288b12cf4b17a638
 
 ENDPOINT_URL = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
 
-# Inicialización del cliente S3 con direccionamiento por Path estricto
 s3_client = boto3.client(
     "s3",
     endpoint_url=ENDPOINT_URL,
@@ -27,14 +25,17 @@ s3_client = boto3.client(
 )
 
 @app.post("/upload")
-async def upload_image(file: UploadFile = File(...)):
+def upload_image(file: UploadFile = File(...)):
     try:
-        # Subida directa del stream del archivo a Cloudflare R2
-        s3_client.upload_fileobj(
-            file.file,
-            R2_BUCKET_NAME,
-            file.filename,
-            ExtraArgs={"ContentType": file.content_type or "image/jpeg"}
+        # Lectura directa de bytes para evitar bloqueos de stream
+        file_bytes = file.file.read()
+        
+        # Subida directa mediante PUT de un solo objeto
+        s3_client.put_object(
+            Bucket=R2_BUCKET_NAME,
+            Key=file.filename,
+            Body=file_bytes,
+            ContentType=file.content_type or "image/jpeg"
         )
         
         file_url = f"{ENDPOINT_URL}/{R2_BUCKET_NAME}/{file.filename}"
